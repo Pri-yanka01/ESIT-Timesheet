@@ -3,33 +3,36 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 export default function DashboardForm() {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const [isLoading, setIsLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   
   const onSubmit = async (data) => {
     setIsLoading(true);
+    setSuccessMessage('');
+    setErrorMessage('');
+    
     try {
-      const response = await fetch('/api/generate-excel', {
+      // Using the new Google Sheets API endpoint
+      const response = await fetch('/api/timesheets/google-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       
+      const responseData = await response.json();
+      
       if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `timesheet-${data.name}-${data.month}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        setSuccessMessage('Timesheet data saved successfully to MongoDB and Google Sheets!');
+        reset(); // Reset form fields
       } else {
-        alert('Error generating Excel file');
+        setErrorMessage(responseData.error || 'Error saving timesheet');
+        console.error('API Error:', responseData);
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error generating Excel file');
+      setErrorMessage('Error processing timesheet');
     } finally {
       setIsLoading(false);
     }
@@ -38,6 +41,19 @@ export default function DashboardForm() {
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6">Timesheet Information</h2>
+      
+      {successMessage && (
+        <div className="mb-6 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          <p className="font-medium">{successMessage}</p>
+        </div>
+      )}
+      
+      {errorMessage && (
+        <div className="mb-6 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <p className="font-medium">{errorMessage}</p>
+        </div>
+      )}
+      
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="mb-4">
           <label className="block text-gray-700 mb-2">Name</label>
@@ -85,7 +101,7 @@ export default function DashboardForm() {
           disabled={isLoading}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:bg-blue-300"
         >
-          {isLoading ? 'Generating...' : 'Generate Excel'}
+          {isLoading ? 'Saving...' : 'Save Timesheet'}
         </button>
       </form>
     </div>
